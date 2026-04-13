@@ -44,3 +44,5 @@ mobile/*.apk
 
 # TypeScript
 *.tsbuildinfo
+
+PRIVATE.md
