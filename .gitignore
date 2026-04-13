@@ -46,3 +46,6 @@ mobile/*.apk
 *.tsbuildinfo
 
 PRIVATE.md
+
+# Infisical
+.infisical.json
