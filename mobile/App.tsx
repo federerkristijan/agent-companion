@@ -3,10 +3,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { Text } from 'react-native'
+import * as Notifications from 'expo-notifications'
 import HomeScreen from './screens/HomeScreen'
 import ChatScreen from './screens/ChatScreen'
 import CalendarScreen from './screens/CalendarScreen'
 import MemosScreen from './screens/MemosScreen'
+import AlarmScreen from './screens/AlarmScreen'
 
 const Tab = createBottomTabNavigator()
 
@@ -44,6 +46,11 @@ export default function App() {
             name="Memos"
             component={MemosScreen}
             options={{ tabBarIcon: () => <Text>📝</Text> }}
+          />
+          <Tab.Screen
+            name="Alarms"
+            component={AlarmScreen}
+            options={{ tabBarIcon: () => <Text>⏰</Text> }}
           />
         </Tab.Navigator>
       </NavigationContainer>
