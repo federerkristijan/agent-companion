@@ -2,12 +2,10 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
-import { Text } from 'react-native'
-import * as Notifications from 'expo-notifications'
+import { Ionicons } from '@expo/vector-icons'
 import HomeScreen from './screens/HomeScreen'
 import ChatScreen from './screens/ChatScreen'
 import CalendarScreen from './screens/CalendarScreen'
-import MemosScreen from './screens/MemosScreen'
 import AlarmScreen from './screens/AlarmScreen'
 
 const Tab = createBottomTabNavigator()
@@ -30,27 +28,22 @@ export default function App() {
           <Tab.Screen
             name="Home"
             component={HomeScreen}
-            options={{ tabBarIcon: () => <Text>🏠</Text> }}
+            options={{ tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} color={color} size={size} /> }}
           />
           <Tab.Screen
             name="Chat"
             component={ChatScreen}
-            options={{ tabBarIcon: () => <Text>💬</Text> }}
+            options={{ tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} color={color} size={size} /> }}
           />
           <Tab.Screen
             name="Calendar"
             component={CalendarScreen}
-            options={{ tabBarIcon: () => <Text>📅</Text> }}
+            options={{ tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'calendar' : 'calendar-outline'} color={color} size={size} /> }}
           />
-          <Tab.Screen
-            name="Memos"
-            component={MemosScreen}
-            options={{ tabBarIcon: () => <Text>📝</Text> }}
-          />
-          <Tab.Screen
+<Tab.Screen
             name="Alarms"
             component={AlarmScreen}
-            options={{ tabBarIcon: () => <Text>⏰</Text> }}
+            options={{ tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'alarm' : 'alarm-outline'} color={color} size={size} /> }}
           />
         </Tab.Navigator>
       </NavigationContainer>
