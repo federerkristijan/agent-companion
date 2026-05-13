@@ -5,4 +5,5 @@ export interface Message {
   role: MessageRole
   content: string
   created_at: string
+  conversation_id?: string | null
 }
