@@ -33,6 +33,25 @@ export async function scheduleAlarm(
   })
 }
 
+export async function scheduleWeeklyAlarm(
+  hour: number,
+  minute: number,
+  weekday: number, // 1=Sunday, 2=Monday, ..., 7=Saturday
+  title: string,
+  body = ''
+): Promise<string> {
+  return Notifications.scheduleNotificationAsync({
+    content: { title, body, sound: true },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday,
+      hour,
+      minute,
+      second: 0,
+    },
+  })
+}
+
 export async function cancelAlarm(id: string): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(id)
 }
