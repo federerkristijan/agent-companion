@@ -1,8 +1,6 @@
 name: SBOM & Security Scan
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -75,6 +73,7 @@ jobs:
       - name: pip-audit
         working-directory: agents
         run: |
+          sudo apt-get install -y libxml2-dev libxslt-dev
           uv export --no-dev --frozen -o /tmp/requirements.txt
           pip install pip-audit
           pip-audit -r /tmp/requirements.txt
