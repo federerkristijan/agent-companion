@@ -6,9 +6,28 @@ See team/blog/AGENTS.md for the full team description.
 
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+_INJECTION_PATTERNS = re.compile(
+    r"ignore\s+(all\s+)?previous\s+instructions?|"
+    r"forget\s+(your|all)|"
+    r"you\s+are\s+now|"
+    r"new\s+instructions?:|"
+    r"system\s*prompt|"
+    r"disregard\s+(all|your|previous)|"
+    r"\x00|"          # null bytes
+    r"\x1b\[",        # ANSI escape sequences
+    re.IGNORECASE,
+)
+
+def _validate_user_message(message: str) -> None:
+    if len(message) > 4000:
+        raise ValueError(f"user_message exceeds 4000 character limit ({len(message)} chars)")
+    if _INJECTION_PATTERNS.search(message):
+        raise ValueError("user_message contains a disallowed pattern")
 
 from langgraph.graph import StateGraph, END
 
@@ -160,6 +179,7 @@ def build_graph():
 
 
 if __name__ == "__main__":
+    _validate_user_message(os.environ["USER_MESSAGE"])
     build_graph().invoke({
         "conversation_id": os.environ["CONVERSATION_ID"],
         "user_message": os.environ["USER_MESSAGE"],
