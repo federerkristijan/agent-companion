@@ -67,8 +67,8 @@ User's latest message: {state['user_message']}""")
             post_data["content"] = agent_messages[-1]["content"] if agent_messages else ""
 
             new_state.update(post_data)
-            new_state["phase"] = "image_picking"
-            new_state["response"] = "Draft approved! Finding a cover image for you now..."
+            new_state["phase"] = "verifying"
+            new_state["response"] = "Draft approved! Verifying facts before publishing..."
             print(f"[writer] draft approved — title: {post_data.get('title')}")
         except (ValueError, json.JSONDecodeError) as e:
             print(f"[writer] approval parse failed: {e} — treating as revision")
