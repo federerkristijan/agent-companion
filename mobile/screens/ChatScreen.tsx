@@ -60,7 +60,17 @@ export default function ChatScreen() {
           setIsTyping(false)
           if (typingTimeout.current) clearTimeout(typingTimeout.current)
         }
-        setMessages((prev) => [...prev, msg])
+        setMessages((prev) => {
+          const tempIdx = msg.role === 'user'
+            ? prev.findIndex(m => m.id.startsWith('temp-') && m.content === msg.content)
+            : -1
+          if (tempIdx !== -1) {
+            const next = [...prev]
+            next[tempIdx] = msg
+            return next
+          }
+          return [...prev, msg]
+        })
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -106,7 +116,6 @@ export default function ChatScreen() {
     setMessages((prev) => [...prev, optimistic])
     startTypingIndicator()
     await supabase.from('messages').insert({ role: 'user', content })
-    fetchMessages()
   }
 
   async function pickAndUpload() {
@@ -178,7 +187,10 @@ export default function ChatScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <FlatList
         ref={listRef}
         data={messages}
@@ -199,29 +211,27 @@ export default function ChatScreen() {
           </View>
         ) : null}
       />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.inputRow}>
-          <TouchableOpacity style={styles.attachBtn} onPress={pickAndUpload} disabled={uploading}>
-            <Ionicons
-              name={uploading ? 'hourglass-outline' : 'attach-outline'}
-              size={22}
-              color="#666"
-            />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Message..."
-            placeholderTextColor="#666"
-            multiline
+      <View style={styles.inputRow}>
+        <TouchableOpacity style={styles.attachBtn} onPress={pickAndUpload} disabled={uploading}>
+          <Ionicons
+            name={uploading ? 'hourglass-outline' : 'attach-outline'}
+            size={22}
+            color="#666"
           />
-          <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
-            <Ionicons name="send" size={17} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </View>
+        </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          value={input}
+          onChangeText={setInput}
+          placeholder="Message..."
+          placeholderTextColor="#666"
+          multiline
+        />
+        <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
+          <Ionicons name="send" size={17} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   )
 }
 
