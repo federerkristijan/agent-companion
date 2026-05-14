@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native'
 import * as Google from 'expo-auth-session/providers/google'
+import * as AuthSession from 'expo-auth-session'
 import {
   clearGoogleSession,
   getStoredEmail,
@@ -28,8 +29,11 @@ export default function CalendarScreen() {
   const [syncing, setSyncing] = useState(false)
   const [reminderSet, setReminderSet] = useState<Set<string>>(new Set())
 
+  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true })
+
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: CLIENT_ID,
+    webClientId: CLIENT_ID,
+    redirectUri,
     scopes: [
       'https://www.googleapis.com/auth/calendar.readonly',
       'https://www.googleapis.com/auth/gmail.readonly',
@@ -135,7 +139,7 @@ export default function CalendarScreen() {
         <Text style={styles.sub}>Sign in to see your events and Gmail reservations</Text>
         <TouchableOpacity
           style={styles.signInBtn}
-          onPress={() => promptAsync()}
+          onPress={() => promptAsync({ useProxy: true })}
           disabled={!request}
         >
           <Text style={styles.signInText}>Sign in with Google</Text>
