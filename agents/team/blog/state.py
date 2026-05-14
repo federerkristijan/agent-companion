@@ -7,7 +7,7 @@ class BlogState(TypedDict):
     conversation_id: str
     user_message: str
     messages: list          # [{role, content}] — full conversation history from Supabase
-    phase: str              # new | drafting | awaiting_review | image_picking | awaiting_image | done
+    phase: str              # new | drafting | awaiting_review | verifying | image_picking | awaiting_image | done
     research: str
     title: str
     slug: str
@@ -19,4 +19,5 @@ class BlogState(TypedDict):
     image_options: list     # URLs presented to user during image_picking phase
     meta_title: str
     meta_description: str
+    verification_issues: list  # fact-check failures found by verifier
     response: str           # what the agent sends back to the user this turn

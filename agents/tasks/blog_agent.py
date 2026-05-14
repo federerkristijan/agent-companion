@@ -34,6 +34,7 @@ from langgraph.graph import StateGraph, END
 from team.blog.state import BlogState
 from team.blog.researcher.agent import research
 from team.blog.writer.agent import write
+from team.blog.verifier.agent import verify
 from team.blog.image_picker.agent import pick_image, select_image
 from team.blog.publisher.agent import publish
 from team.skills.supabase import get_client
@@ -101,7 +102,9 @@ def detect_phase(messages: list[dict]) -> str:
         return "done"
     if "cover image options" in last or "dall-e" in last:
         return "awaiting_image"
-    if "approved" in last or "finding a cover image" in last:
+    if "verifying facts" in last:
+        return "verifying"
+    if "all facts verified" in last:
         return "image_picking"
     return "awaiting_review"
 
@@ -135,6 +138,8 @@ def route(state: BlogState) -> str:
         return "research"
     if phase in ("drafting", "awaiting_review"):
         return "write"
+    if phase == "verifying":
+        return "verify"
     if phase == "image_picking":
         return "pick_image"
     if phase == "awaiting_image":
@@ -152,6 +157,7 @@ def build_graph():
     graph.add_node("load", load_node)
     graph.add_node("research", research)
     graph.add_node("write", write)
+    graph.add_node("verify", verify)
     graph.add_node("pick_image", pick_image)
     graph.add_node("select_image", select_image)
     graph.add_node("publish", publish)
@@ -161,6 +167,7 @@ def build_graph():
     graph.add_conditional_edges("load", route, {
         "research": "research",
         "write": "write",
+        "verify": "verify",
         "pick_image": "pick_image",
         "select_image": "select_image",
         "publish": "publish",
@@ -171,7 +178,7 @@ def build_graph():
     graph.add_edge("research", "write")
     # image selection chains into publish on the same turn — no extra user turn needed
     graph.add_edge("select_image", "publish")
-    for node in ("write", "pick_image", "publish"):
+    for node in ("write", "verify", "pick_image", "publish"):
         graph.add_edge(node, "save")
     graph.add_edge("save", END)
 
@@ -196,5 +203,6 @@ if __name__ == "__main__":
         "image_options": [],
         "meta_title": "",
         "meta_description": "",
+        "verification_issues": [],
         "response": "",
     })
