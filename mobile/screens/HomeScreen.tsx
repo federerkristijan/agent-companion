@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import Constants from 'expo-constants'
 
 function greeting() {
   const h = new Date().getHours()
@@ -24,6 +25,9 @@ export default function HomeScreen() {
         <Text style={styles.greeting}>{greeting()}</Text>
         <Text style={styles.title}>Agent Companion</Text>
         <Text style={styles.subtitle}>Your personal AI-powered chief of operations.</Text>
+        <Text style={styles.version}>
+          v{Constants.nativeAppVersion} ({Constants.nativeBuildVersion})
+        </Text>
       </View>
 
       <View style={styles.cards}>
@@ -55,6 +59,7 @@ const styles = StyleSheet.create({
   greeting: { color: '#666', fontSize: 15, marginBottom: 6 },
   title: { color: '#fff', fontSize: 32, fontWeight: '700', marginBottom: 8 },
   subtitle: { color: '#444', fontSize: 15, lineHeight: 22 },
+  version: { color: '#2a2a2a', fontSize: 11, marginTop: 8 },
   cards: { gap: 12, paddingBottom: 24 },
   card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#161616', borderRadius: 16, padding: 16, gap: 14, borderWidth: 1, borderColor: '#1e1e1e' },
   cardIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#0d1f3c', alignItems: 'center', justifyContent: 'center' },
