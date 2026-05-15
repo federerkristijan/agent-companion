@@ -7,3 +7,9 @@ export interface Message {
   created_at: string
   conversation_id?: string | null
 }
+
+export interface Conversation {
+  id: string
+  title: string
+  created_at: string
+}
