@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Animated,
+  AppState,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -51,29 +52,14 @@ export default function ChatScreen() {
 
   useEffect(() => {
     fetchMessages()
-    const channel = supabase
-      .channel('messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        const msg = payload.new as Message
-        if (msg.conversation_id != null) return
-        if (msg.role === 'agent') {
-          setIsTyping(false)
-          if (typingTimeout.current) clearTimeout(typingTimeout.current)
-        }
-        setMessages((prev) => {
-          const tempIdx = msg.role === 'user'
-            ? prev.findIndex(m => m.id.startsWith('temp-') && m.content === msg.content)
-            : -1
-          if (tempIdx !== -1) {
-            const next = [...prev]
-            next[tempIdx] = msg
-            return next
-          }
-          return [...prev, msg]
-        })
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') fetchMessages()
+    })
+    const poll = setInterval(fetchMessages, 3000)
+    return () => {
+      appStateSub.remove()
+      clearInterval(poll)
+    }
   }, [])
 
   useEffect(() => {
@@ -99,7 +85,13 @@ export default function ChatScreen() {
       .select('*')
       .is('conversation_id', null)
       .order('created_at', { ascending: true })
-    if (data) setMessages(data)
+    if (data) {
+      setMessages(data)
+      if (data.length > 0 && data[data.length - 1].role === 'agent') {
+        setIsTyping(false)
+        if (typingTimeout.current) clearTimeout(typingTimeout.current)
+      }
+    }
   }
 
   function startTypingIndicator() {
