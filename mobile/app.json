@@ -3,6 +3,7 @@
     "name": "Agent Companion",
     "slug": "mobile",
     "version": "1.0.0",
+    "scheme": "com.kristijan.agentcompanion",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -31,6 +32,7 @@
     "plugins": [
       "expo-web-browser",
       "expo-secure-store",
+      "@react-native-google-signin/google-signin",
       [
         "expo-notifications",
         {

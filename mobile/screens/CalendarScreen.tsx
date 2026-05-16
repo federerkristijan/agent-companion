@@ -1,25 +1,27 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
-import * as Google from 'expo-auth-session/providers/google'
-import * as AuthSession from 'expo-auth-session'
-import {
-  clearGoogleSession,
-  getStoredEmail,
-  getValidAccessToken,
-  storeGoogleToken,
-} from '../lib/google-auth'
+import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { CalendarEvent, getUpcomingEvents } from '../lib/google-calendar'
 import { getEmailEvents } from '../lib/gmail'
 import { scheduleEventReminder } from '../lib/notifications'
 
-const CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID!
+const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/gmail.readonly',
+]
+
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  offlineAccess: false,
+})
 
 export default function CalendarScreen() {
   const [accessToken, setAccessToken] = useState<string | null>(null)
@@ -29,52 +31,33 @@ export default function CalendarScreen() {
   const [syncing, setSyncing] = useState(false)
   const [reminderSet, setReminderSet] = useState<Set<string>>(new Set())
 
-  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true })
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: CLIENT_ID,
-    redirectUri,
-    scopes: [
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'email',
-    ],
-  })
-
   useEffect(() => {
     checkExistingSession()
   }, [])
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { access_token, expires_in } = response.authentication!
-      handleSignIn(access_token, expires_in ?? 3600)
-    }
-  }, [response])
-
   async function checkExistingSession() {
-    const token = await getValidAccessToken()
-    if (token) {
+    try {
+      const user = await GoogleSignin.signInSilently()
+      setEmail(user.data?.user.email ?? null)
+      const { accessToken: token } = await GoogleSignin.getTokens()
       setAccessToken(token)
-      const storedEmail = await getStoredEmail()
-      setEmail(storedEmail)
       fetchEvents(token)
-    } else {
+    } catch {
       setLoading(false)
     }
   }
 
-  async function handleSignIn(token: string, expiresIn: number) {
+  async function handleSignIn() {
     try {
-      const profileResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const profile = await profileResp.json()
-      await storeGoogleToken(token, expiresIn, profile.email)
+      await GoogleSignin.hasPlayServices()
+      const userInfo = await GoogleSignin.signIn()
+      setEmail(userInfo.data?.user.email ?? null)
+      await GoogleSignin.addScopes({ scopes: CALENDAR_SCOPES })
+      const { accessToken: token } = await GoogleSignin.getTokens()
       setAccessToken(token)
-      setEmail(profile.email)
       fetchEvents(token)
-    } catch {
+    } catch (error: any) {
+      Alert.alert('Sign-in error', `Code: ${error.code ?? 'none'}\n${error.message ?? ''}`)
       setLoading(false)
     }
   }
@@ -99,7 +82,7 @@ export default function CalendarScreen() {
   }
 
   async function handleSignOut() {
-    await clearGoogleSession()
+    await GoogleSignin.signOut()
     setAccessToken(null)
     setEmail(null)
     setEvents([])
@@ -137,11 +120,7 @@ export default function CalendarScreen() {
       <View style={styles.center}>
         <Text style={styles.heading}>Connect Google Calendar</Text>
         <Text style={styles.sub}>Sign in to see your events and Gmail reservations</Text>
-        <TouchableOpacity
-          style={styles.signInBtn}
-          onPress={() => promptAsync({ useProxy: true })}
-          disabled={!request}
-        >
+        <TouchableOpacity style={styles.signInBtn} onPress={handleSignIn}>
           <Text style={styles.signInText}>Sign in with Google</Text>
         </TouchableOpacity>
       </View>
