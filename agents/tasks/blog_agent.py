@@ -177,11 +177,20 @@ def build_graph():
         END: END,
     })
 
-    # researcher chains into writer on the same turn — user gets a draft, not silence
     graph.add_edge("research", "write")
-    # image selection chains into publish on the same turn — no extra user turn needed
     graph.add_edge("select_image", "publish")
-    for node in ("write", "verify", "pick_image", "publish"):
+
+    # draft approved → verify immediately (same turn); still drafting → save and wait
+    graph.add_conditional_edges("write",
+        lambda s: "verify" if s["phase"] == "verifying" else "save",
+        {"verify": "verify", "save": "save"})
+
+    # all facts verified → pick_image immediately (same turn); issues found → save and wait
+    graph.add_conditional_edges("verify",
+        lambda s: "pick_image" if s["phase"] == "image_picking" else "save",
+        {"pick_image": "pick_image", "save": "save"})
+
+    for node in ("pick_image", "publish"):
         graph.add_edge(node, "save")
     graph.add_edge("save", END)
 
