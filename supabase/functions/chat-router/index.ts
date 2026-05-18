@@ -66,6 +66,7 @@ Deno.serve(async (req) => {
     return new Response("rejected", { status: 200 })
   }
   console.log("[chat-router] classifying intent...")
+  try {
 
   // Load 20 most recent messages from this conversation, reversed to chronological order
   const base = supabase.from("messages").select("role, content").order("created_at", { ascending: false }).limit(20)
@@ -316,6 +317,17 @@ Deno.serve(async (req) => {
         }),
       }
     )
+  }
+
+  } catch (e) {
+    console.error("[chat-router] unhandled error:", e)
+    try {
+      await supabase.from("messages").insert({
+        role: "agent",
+        content: "Something went wrong. Please try again.",
+        ...(record.conversation_id != null && { conversation_id: record.conversation_id }),
+      })
+    } catch (_) { /* best effort */ }
   }
 
   return new Response("ok", { status: 200 })
