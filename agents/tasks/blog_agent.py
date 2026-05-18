@@ -93,19 +93,22 @@ def extract_metadata(messages: list[dict]) -> dict:
 # ── Phase detection ───────────────────────────────────────────────────────────
 
 def detect_phase(messages: list[dict]) -> str:
-    """Infer the current phase from conversation history."""
+    """Infer the current phase by scanning agent messages newest-first.
+    Scanning all history (not just the last message) recovers conversations
+    where a later writer response overwrote the phase signal."""
     agent_messages = [m for m in messages if m["role"] == "agent"]
     if not agent_messages:
         return "new"
-    last = agent_messages[-1]["content"].lower()
-    if "published" in last and ("slug" in last or "reading time" in last):
-        return "done"
-    if "cover image options" in last or "dall-e" in last:
-        return "awaiting_image"
-    if "verifying facts" in last:
-        return "verifying"
-    if "all facts verified" in last:
-        return "image_picking"
+    for m in reversed(agent_messages):
+        c = m["content"].lower()
+        if "published" in c and ("slug" in c or "reading time" in c):
+            return "done"
+        if "cover image options" in c or "dall-e" in c:
+            return "awaiting_image"
+        if "image generation failed" in c or "all facts verified" in c:
+            return "image_picking"
+        if "verifying facts" in c or "draft approved" in c:
+            return "verifying"
     return "awaiting_review"
 
 
