@@ -12,7 +12,7 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 )
 
-const SYSTEM_PROMPT = `You are a personal AI assistant for Kristijan. You help with research, answer questions, and discuss ideas. Be concise and direct.`
+const SYSTEM_PROMPT = `You are a personal AI assistant for Kristijan. You help with research, answer questions, discuss ideas, and can generate images. Be concise and direct.`
 
 const CLASSIFIER_PROMPT = `Classify the user message into one of: chat, search, or blog.
 
@@ -66,6 +66,7 @@ Deno.serve(async (req) => {
     return new Response("rejected", { status: 200 })
   }
   console.log("[chat-router] classifying intent...")
+  try {
 
   // Load 20 most recent messages from this conversation, reversed to chronological order
   const base = supabase.from("messages").select("role, content").order("created_at", { ascending: false }).limit(20)
@@ -107,42 +108,39 @@ Deno.serve(async (req) => {
   const intent: string = classifyData.choices[0].message.content.trim().toLowerCase()
   console.log("[chat-router] intent:", intent)
 
-  if (intent === "chat" || intent === "search") {
+  if (intent === "search") {
+    console.log("[chat-router] fetching web results via Tavily...")
+    const tavilyController = new AbortController()
+    const tavilyTimer = setTimeout(() => tavilyController.abort(), 10_000)
     let systemPrompt = SYSTEM_PROMPT
-
-    if (intent === "search") {
-      console.log("[chat-router] fetching web results via Tavily...")
-      const tavilyController = new AbortController()
-      const tavilyTimer = setTimeout(() => tavilyController.abort(), 10_000)
-      try {
-        const tavilyRes = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: TAVILY_API_KEY,
-            query: content,
-            search_depth: "basic",
-            max_results: 5,
-          }),
-          signal: tavilyController.signal,
-        })
-        const tavilyData = await tavilyRes.json()
-        const results: { title: string; url: string; content: string }[] = tavilyData.results ?? []
-        console.log("[chat-router] Tavily returned", results.length, "results")
-        const searchContext = results
-          .map((r) => `**${r.title}**\n${r.url}\n${r.content}`)
-          .join("\n\n")
-        systemPrompt = `${SYSTEM_PROMPT}\n\nCurrent web search results for the user's query:\n\n${searchContext}\n\nAnswer using these results. Cite source URLs inline where relevant.`
-      } finally {
-        clearTimeout(tavilyTimer)
-      }
+    try {
+      const tavilyRes = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: TAVILY_API_KEY,
+          query: content,
+          search_depth: "basic",
+          max_results: 5,
+        }),
+        signal: tavilyController.signal,
+      })
+      const tavilyData = await tavilyRes.json()
+      const results: { title: string; url: string; content: string }[] = tavilyData.results ?? []
+      console.log("[chat-router] Tavily returned", results.length, "results")
+      const searchContext = results
+        .map((r) => `**${r.title}**\n${r.url}\n${r.content}`)
+        .join("\n\n")
+      systemPrompt = `${SYSTEM_PROMPT}\n\nCurrent web search results for the user's query:\n\n${searchContext}\n\nAnswer using these results. Cite source URLs inline where relevant.`
+    } finally {
+      clearTimeout(tavilyTimer)
     }
 
-    const chatController = new AbortController()
-    const chatTimer = setTimeout(() => chatController.abort(), 40_000)
-    let chatRes: Response
+    const searchController = new AbortController()
+    const searchTimer = setTimeout(() => searchController.abort(), 40_000)
+    let searchRes: Response
     try {
-      chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      searchRes = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -150,21 +148,158 @@ Deno.serve(async (req) => {
           messages: [{ role: "system", content: systemPrompt }, ...messages],
           max_tokens: 1024,
         }),
-        signal: chatController.signal,
+        signal: searchController.signal,
       })
     } finally {
-      clearTimeout(chatTimer)
+      clearTimeout(searchTimer)
     }
-    const chatData = await chatRes.json()
-    console.log("[chat-router] response received, inserting reply...")
-    const reply: string = chatData.choices[0].message.content
-
+    const searchData = await searchRes.json()
+    const searchReply: string = searchData.choices[0].message.content
     await supabase.from("messages").insert({
       role: "agent",
-      content: reply,
+      content: searchReply,
       ...(record.conversation_id != null && { conversation_id: record.conversation_id }),
     })
-    console.log("[chat-router] reply inserted")
+    console.log("[chat-router] search reply inserted")
+
+  } else if (intent === "chat") {
+    const chatTools = [
+      {
+        type: "function",
+        function: {
+          name: "generate_image",
+          description: "Generate an image using DALL-E. Use when the user asks to create, draw, or generate an image.",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Detailed visual description. Include style, subject, colors, and composition.",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
+      },
+    ]
+
+    const firstController = new AbortController()
+    const firstTimer = setTimeout(() => firstController.abort(), 30_000)
+    let firstRes: Response
+    try {
+      firstRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+          max_tokens: 1024,
+          tools: chatTools,
+          tool_choice: "auto",
+        }),
+        signal: firstController.signal,
+      })
+    } finally {
+      clearTimeout(firstTimer)
+    }
+    const firstData = await firstRes.json()
+    const firstMessage = firstData.choices[0].message
+    console.log("[chat-router] first response received, tool_calls:", firstMessage.tool_calls?.length ?? 0)
+
+    if (firstMessage.tool_calls?.length > 0) {
+      const toolCall = firstMessage.tool_calls[0]
+      const toolArgs = JSON.parse(toolCall.function.arguments)
+      console.log("[chat-router] generating image, prompt:", toolArgs.prompt?.slice(0, 80))
+
+      let imageUrl = ""
+      try {
+        const dalleController = new AbortController()
+        const dalleTimer = setTimeout(() => dalleController.abort(), 55_000)
+        try {
+          const dalleRes = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "dall-e-3",
+              prompt: toolArgs.prompt,
+              size: "1792x1024",
+              n: 1,
+              response_format: "b64_json",
+            }),
+            signal: dalleController.signal,
+          })
+          const dalleData = await dalleRes.json()
+          const b64: string = dalleData.data[0].b64_json
+          const imageBytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+          const fileName = `${Date.now()}.png`
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("attachments")
+            .upload(fileName, imageBytes, { contentType: "image/png" })
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage.from("attachments").getPublicUrl(uploadData.path)
+            imageUrl = publicUrl
+            await supabase.from("messages").insert({
+              role: "agent",
+              content: JSON.stringify({ text: "", fileUrl: publicUrl, mimeType: "image/png" }),
+              ...(record.conversation_id != null && { conversation_id: record.conversation_id }),
+            })
+            console.log("[chat-router] image uploaded and posted:", publicUrl.slice(-40))
+          } else {
+            console.error("[chat-router] storage upload error:", uploadError.message)
+          }
+        } finally {
+          clearTimeout(dalleTimer)
+        }
+      } catch (e) {
+        console.error("[chat-router] image generation failed:", e)
+      }
+
+      const secondController = new AbortController()
+      const secondTimer = setTimeout(() => secondController.abort(), 20_000)
+      try {
+        const secondRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              ...messages,
+              { role: "assistant", content: null, tool_calls: firstMessage.tool_calls },
+              {
+                role: "tool",
+                tool_call_id: toolCall.id,
+                content: imageUrl ? `Image generated successfully.` : "Image generation failed.",
+              },
+            ],
+            max_tokens: 256,
+          }),
+          signal: secondController.signal,
+        })
+        const secondData = await secondRes.json()
+        const confirmReply: string = secondData.choices[0].message.content
+        if (confirmReply) {
+          await supabase.from("messages").insert({
+            role: "agent",
+            content: confirmReply,
+            ...(record.conversation_id != null && { conversation_id: record.conversation_id }),
+          })
+        }
+      } finally {
+        clearTimeout(secondTimer)
+      }
+      console.log("[chat-router] image flow complete")
+
+    } else {
+      const reply: string = firstMessage.content
+      await supabase.from("messages").insert({
+        role: "agent",
+        content: reply,
+        ...(record.conversation_id != null && { conversation_id: record.conversation_id }),
+      })
+      console.log("[chat-router] chat reply inserted")
+    }
+
   } else {
     // Complex task — hand off to GitHub Actions
     await fetch(
@@ -182,6 +317,17 @@ Deno.serve(async (req) => {
         }),
       }
     )
+  }
+
+  } catch (e) {
+    console.error("[chat-router] unhandled error:", e)
+    try {
+      await supabase.from("messages").insert({
+        role: "agent",
+        content: "Something went wrong. Please try again.",
+        ...(record.conversation_id != null && { conversation_id: record.conversation_id }),
+      })
+    } catch (_) { /* best effort */ }
   }
 
   return new Response("ok", { status: 200 })

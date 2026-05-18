@@ -93,19 +93,22 @@ def extract_metadata(messages: list[dict]) -> dict:
 # ── Phase detection ───────────────────────────────────────────────────────────
 
 def detect_phase(messages: list[dict]) -> str:
-    """Infer the current phase from conversation history."""
+    """Infer the current phase by scanning agent messages newest-first.
+    Scanning all history (not just the last message) recovers conversations
+    where a later writer response overwrote the phase signal."""
     agent_messages = [m for m in messages if m["role"] == "agent"]
     if not agent_messages:
         return "new"
-    last = agent_messages[-1]["content"].lower()
-    if "published" in last and ("slug" in last or "reading time" in last):
-        return "done"
-    if "cover image options" in last or "dall-e" in last:
-        return "awaiting_image"
-    if "verifying facts" in last:
-        return "verifying"
-    if "all facts verified" in last:
-        return "image_picking"
+    for m in reversed(agent_messages):
+        c = m["content"].lower()
+        if "published" in c and ("slug" in c or "reading time" in c):
+            return "done"
+        if "cover image options" in c or "dall-e" in c:
+            return "awaiting_image"
+        if "image generation failed" in c or "all facts verified" in c:
+            return "image_picking"
+        if "verifying facts" in c or "draft approved" in c:
+            return "verifying"
     return "awaiting_review"
 
 
@@ -174,11 +177,20 @@ def build_graph():
         END: END,
     })
 
-    # researcher chains into writer on the same turn — user gets a draft, not silence
     graph.add_edge("research", "write")
-    # image selection chains into publish on the same turn — no extra user turn needed
     graph.add_edge("select_image", "publish")
-    for node in ("write", "verify", "pick_image", "publish"):
+
+    # draft approved → verify immediately (same turn); still drafting → save and wait
+    graph.add_conditional_edges("write",
+        lambda s: "verify" if s["phase"] == "verifying" else "save",
+        {"verify": "verify", "save": "save"})
+
+    # all facts verified → pick_image immediately (same turn); issues found → save and wait
+    graph.add_conditional_edges("verify",
+        lambda s: "pick_image" if s["phase"] == "image_picking" else "save",
+        {"pick_image": "pick_image", "save": "save"})
+
+    for node in ("pick_image", "publish"):
         graph.add_edge(node, "save")
     graph.add_edge("save", END)
 
