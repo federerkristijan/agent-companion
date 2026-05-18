@@ -95,10 +95,13 @@ def _run_blog(user_message: str, conversation_id: str, is_new: bool) -> str:
         .eq("conversation_id", conversation_id)
         .eq("role", "agent")
         .order("created_at", ascending=False)
-        .limit(1)
         .execute()
     )
-    return ((resp.data or [{}])[0].get("content") or "")
+    for row in (resp.data or []):
+        content = row.get("content") or ""
+        if not content.startswith("__METADATA__:"):
+            return content
+    return ""
 
 
 # ── Routing table ─────────────────────────────────────────────────────────────
@@ -138,6 +141,8 @@ def run(task_type: str, user_message: str) -> None:
 
     if response:
         post_to_mobile_chat(response)
+    else:
+        post_to_mobile_chat("Something went wrong processing your request. Please try again.")
 
     if should_close(response):
         close_session(task_type, conversation_id)

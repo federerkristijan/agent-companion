@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Dimensions, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, Dimensions, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
@@ -91,8 +91,17 @@ export default function ConversationListScreen() {
   async function deleteConversation() {
     if (!selectedConv) return
     setMenuVisible(false)
-    await supabase.from('messages').delete().eq('conversation_id', selectedConv.id)
-    await supabase.from('conversations').delete().eq('id', selectedConv.id)
+    const { error: msgErr } = await supabase.from('messages').delete().eq('conversation_id', selectedConv.id)
+    if (msgErr) {
+      Alert.alert('Error', 'Could not delete conversation messages.')
+      return
+    }
+    const { data: deleted, error: convErr } = await supabase
+      .from('conversations').delete().eq('id', selectedConv.id).select()
+    if (convErr || !deleted?.length) {
+      Alert.alert('Error', 'Could not delete conversation. Check Supabase RLS policies.')
+      return
+    }
     setConversations(prev => prev.filter(c => c.id !== selectedConv.id))
   }
 
