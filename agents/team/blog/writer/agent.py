@@ -1,17 +1,46 @@
 """Writer — drafts and revises the blog post with the user."""
 
 import json
+import urllib.request
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from team.blog.state import BlogState
 
 
+def _readable_content(raw: str) -> str:
+    """Return human/LLM-readable text from a message content string.
+    Handles file attachment JSON by fetching text files from their public URL."""
+    try:
+        p = json.loads(raw)
+        if not isinstance(p, dict):
+            return raw
+        if "fileUrl" in p:
+            name = p.get("fileName", "file")
+            mime = p.get("mimeType", "")
+            text = p.get("text", "")
+            if text:
+                return f"[File: {name}]\n{text}"
+            is_text = "text/" in mime or name.endswith((".txt", ".md", ".csv", ".json"))
+            if is_text:
+                try:
+                    with urllib.request.urlopen(p["fileUrl"], timeout=15) as r:
+                        return f"[Attached file: {name}]\n{r.read(8000).decode('utf-8', errors='replace')}"
+                except Exception:
+                    pass
+            return f"[Attached file: {name} — {mime or 'binary, content not available'}]"
+        if "text" in p:
+            return p["text"]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return raw
+
+
 def write(state: BlogState) -> BlogState:
     llm = ChatOpenAI(model="gpt-4o", max_tokens=8192)
 
     history_text = "\n".join(
-        f"{m['role'].upper()}: {m['content']}"
+        f"{m['role'].upper()}: {_readable_content(m['content'])}"
         for m in state["messages"]
     )
 
