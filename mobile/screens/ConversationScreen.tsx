@@ -293,7 +293,7 @@ export default function ConversationScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <FlatList
         ref={listRef}
@@ -301,6 +301,7 @@ export default function ConversationScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
         renderItem={renderMessage}
         ListFooterComponent={isTyping ? (
           <View style={styles.row}>
