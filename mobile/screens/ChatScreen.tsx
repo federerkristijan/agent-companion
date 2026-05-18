@@ -9,9 +9,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 import * as DocumentPicker from 'expo-document-picker'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -110,6 +112,12 @@ export default function ChatScreen() {
     await supabase.from('messages').insert({ role: 'user', content })
   }
 
+  async function copyMessage(text: string) {
+    if (!text) return
+    await Clipboard.setStringAsync(text)
+    ToastAndroid.show('Copied', ToastAndroid.SHORT)
+  }
+
   async function pickAndUpload() {
     const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true })
     if (result.canceled) return
@@ -128,9 +136,11 @@ export default function ChatScreen() {
       const optimistic: Message = { id: `temp-${Date.now()}`, role: 'user', content, created_at: new Date().toISOString() }
       setMessages(prev => [...prev, optimistic])
       await supabase.from('messages').insert({ role: 'user', content })
+      ToastAndroid.show('File sent', ToastAndroid.SHORT)
       fetchMessages()
     } catch (e) {
       console.error('Upload failed', e)
+      ToastAndroid.show('Upload failed', ToastAndroid.SHORT)
     } finally {
       setUploading(false)
     }
@@ -148,7 +158,11 @@ export default function ChatScreen() {
             <Ionicons name="hardware-chip-outline" size={14} color="#60a5fa" />
           </View>
         )}
-        <View style={[styles.bubble, isUser ? styles.userBubble : styles.agentBubble]}>
+        <TouchableOpacity
+          onLongPress={() => copyMessage(parsed.text)}
+          activeOpacity={0.8}
+          style={[styles.bubble, isUser ? styles.userBubble : styles.agentBubble]}
+        >
           {parsed.text.length > 0 && (
             <Text style={[styles.bubbleText, isUser ? styles.userText : styles.agentText]}>
               {parsed.text}
@@ -173,7 +187,7 @@ export default function ChatScreen() {
               </Text>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     )
   }
