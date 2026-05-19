@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from team.blog.state import BlogState
-from team.skills.dalle import generate_blog_cover_bytes
+from team.skills.image_gen import generate_blog_cover_bytes
 from team.skills.unsplash import search_photos
 from team.skills.supabase import get_client, upload_blog_image
 

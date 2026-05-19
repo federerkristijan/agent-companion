@@ -24,9 +24,9 @@ ALWAYS reply "search" when the message asks about any of these — even if the q
 - exchange rates or currency conversion
 - anything where the answer could have changed since 2024
 
-Reply "blog" when the user wants to write, create, draft, or publish a blog post or article.
+Reply "blog" ONLY when the user explicitly wants to write, draft, or publish a blog post or article (e.g. "write a blog post about X", "draft an article"). Image generation and cover images are NOT blog tasks.
 
-Reply "chat" for everything else: opinions, explanations, coding help, brainstorming, math, general knowledge.
+Reply "chat" for everything else: opinions, explanations, coding help, brainstorming, math, general knowledge, image generation.
 
 Reply with ONLY one word: chat, search, or blog.`
 
@@ -220,17 +220,20 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "dall-e-3",
+              model: "gpt-image-1",
               prompt: toolArgs.prompt,
-              size: "1792x1024",
+              size: "1536x1024",
               n: 1,
-              response_format: "b64_json",
             }),
             signal: dalleController.signal,
           })
+          if (!dalleRes.ok) {
+            const err = await dalleRes.json()
+            throw new Error(`image-gen ${dalleRes.status}: ${JSON.stringify(err.error ?? err)}`)
+          }
           const dalleData = await dalleRes.json()
           const b64: string = dalleData.data[0].b64_json
-          const imageBytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+          const imageBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
           const fileName = `${Date.now()}.png`
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from("attachments")
