@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -46,6 +47,10 @@ export default function ChatScreen() {
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
+  const [imageModalVisible, setImageModalVisible] = useState(false)
+  const [imagePrompt, setImagePrompt] = useState('')
+  const [generating, setGenerating] = useState(false)
   const listRef = useRef<FlatList>(null)
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dot1 = useRef(new Animated.Value(0)).current
@@ -116,6 +121,41 @@ export default function ChatScreen() {
     if (!text) return
     await Clipboard.setStringAsync(text)
     ToastAndroid.show('Copied', ToastAndroid.SHORT)
+  }
+
+  async function openImageModal() {
+    setSuggesting(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('suggest-image-prompt', {
+        body: { conversation_id: null },
+      })
+      if (error) throw error
+      setImagePrompt(data.prompt ?? '')
+    } catch {
+      setImagePrompt('')
+    } finally {
+      setSuggesting(false)
+      setImageModalVisible(true)
+    }
+  }
+
+  async function generateImage() {
+    if (!imagePrompt.trim()) return
+    setGenerating(true)
+    try {
+      const { error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: imagePrompt.trim(), conversation_id: null },
+      })
+      if (error) throw error
+      setImageModalVisible(false)
+      setImagePrompt('')
+      startTypingIndicator()
+      fetchMessages()
+    } catch {
+      ToastAndroid.show('Image generation failed', ToastAndroid.SHORT)
+    } finally {
+      setGenerating(false)
+    }
   }
 
   async function pickAndUpload() {
@@ -226,6 +266,13 @@ export default function ChatScreen() {
             color="#666"
           />
         </TouchableOpacity>
+        <TouchableOpacity style={styles.attachBtn} onPress={openImageModal} disabled={suggesting}>
+          <Ionicons
+            name={suggesting ? 'hourglass-outline' : 'image-outline'}
+            size={22}
+            color="#666"
+          />
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           value={input}
@@ -238,6 +285,42 @@ export default function ChatScreen() {
           <Ionicons name="send" size={17} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={imageModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Generate Image</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={imagePrompt}
+              onChangeText={setImagePrompt}
+              placeholder="Describe the image..."
+              placeholderTextColor="#555"
+              multiline
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setImageModalVisible(false)}>
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalGenerateBtn, generating && styles.modalGenerateBtnDisabled]}
+                onPress={generateImage}
+                disabled={generating || !imagePrompt.trim()}
+              >
+                <Text style={styles.modalGenerateText}>
+                  {generating ? 'Generating…' : 'Generate'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }
@@ -267,4 +350,13 @@ const styles = StyleSheet.create({
   attachBtn: { padding: 6, justifyContent: 'center' },
   input: { flex: 1, backgroundColor: '#1e1e1e', color: '#fff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 120 },
   sendBtn: { backgroundColor: '#2563eb', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalSheet: { backgroundColor: '#1a1a1a', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 },
+  modalTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  modalInput: { backgroundColor: '#0f0f0f', color: '#fff', borderRadius: 12, padding: 14, fontSize: 15, minHeight: 100, textAlignVertical: 'top' },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 20 },
+  modalCancel: { color: 'rgba(255,255,255,0.45)', fontSize: 15 },
+  modalGenerateBtn: { backgroundColor: '#2563eb', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 },
+  modalGenerateBtnDisabled: { opacity: 0.5 },
+  modalGenerateText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 })
