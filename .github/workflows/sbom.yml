@@ -40,51 +40,6 @@ jobs:
           name: sbom-npm
           path: sbom-npm.cdx.json
 
-  sbom-python:
-    name: SBOM & Scan — Agents (Python)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
-        with:
-          python-version: '3.13'
-
-      - name: Install dependencies
-        working-directory: agents
-        run: uv sync
-
-      - name: Generate SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
-        with:
-          path: ./agents
-          artifact-name: sbom-python.cdx.json
-          output-file: sbom-python.cdx.json
-          format: cyclonedx-json
-
-      - name: Scan with grype
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-          grype sbom:sbom-python.cdx.json --fail-on high
-
-      - name: pip-audit
-        working-directory: agents
-        run: |
-          sudo apt-get install -y libxml2-dev libxslt-dev
-          uv export --no-dev --frozen -o /tmp/requirements.txt
-          pip install pip-audit
-          pip-audit -r /tmp/requirements.txt
-
-      - name: Upload SBOM
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: sbom-python
-          path: sbom-python.cdx.json
-
   secrets:
     name: Secret Scan
     runs-on: ubuntu-latest

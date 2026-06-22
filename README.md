@@ -50,9 +50,6 @@ Android app (Expo) — distributed via Google Play internal testing.
 ## Structure
 
 ```
-agents/                 # Python agents (LangGraph)
-  tasks/                # Entry points per agent
-  team/                 # Specialist sub-agents and shared skills
 mobile/                 # Expo companion app
 supabase/
   functions/chat-router # Edge Function — intent classifier and chat handler
