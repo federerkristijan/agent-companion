@@ -31,6 +31,7 @@ jobs:
 
       - name: npm audit
         working-directory: mobile
+        continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
 
       - name: Upload SBOM

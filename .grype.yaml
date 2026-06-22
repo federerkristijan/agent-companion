@@ -1,0 +1,12 @@
+# grype config for the Mobile (npm) SBOM gate (`grype --fail-on high`).
+#
+# Every advisory below is a TRANSITIVE dependency pinned by the Expo SDK 54 /
+# React Native 0.81 toolchain (e.g. `ws` via @supabase/realtime-js, expo and
+# react-native; `shell-quote` and `undici` via @expo/* tooling). `npm audit fix`
+# cannot resolve them without a breaking react-native downgrade (0.81 -> 0.75),
+# so they are reviewed and accepted here, and re-checked on every Expo upgrade.
+# Lower-severity findings are left visible — they do not trip `--fail-on high`.
+ignore:
+  - vulnerability: GHSA-96hv-2xvq-fx4p   # ws — memory-exhaustion DoS; pinned by Expo/RN, no non-breaking fix
+  - vulnerability: GHSA-w7jw-789q-3m8p   # shell-quote — newline escaping in quote(); transitive @expo/* tooling
+  - vulnerability: GHSA-vxpw-j846-p89q   # undici — WebSocket DoS; pinned by Expo CLI, no non-breaking fix
