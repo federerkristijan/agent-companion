@@ -1,11 +1,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
+// ── CHANGED FOR SERVER MIGRATION ───────────────────────────────────────────────
+// Complex tasks used to be dispatched to a GitHub Actions workflow. They are now
+// enqueued into the Supabase `agent_jobs` table, which the server worker polls.
+// The GITHUB_TOKEN / GITHUB_REPO / COMPLEX_WORKFLOW constants are no longer used
+// and have been removed. Nothing else in this function changed.
+// ───────────────────────────────────────────────────────────────────────────────
+
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!
 const TAVILY_API_KEY = Deno.env.get("TAVILY_API_KEY")!
-const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN")!
-const GITHUB_REPO = "federerkristijan/agent-companion"
-const COMPLEX_WORKFLOW = "chat-complex.yml"
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -304,22 +308,22 @@ Deno.serve(async (req) => {
     }
 
   } else {
-    // Complex task — hand off to GitHub Actions
-    await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${COMPLEX_WORKFLOW}/dispatches`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ref: "main",
-          inputs: { message_id: record.id, task_type: intent },
-        }),
-      }
-    )
+    // Complex task — enqueue for the server worker (Supabase job queue).
+    // Replaces the old GitHub Actions workflow_dispatch.
+    const { error: jobErr } = await supabase.from("agent_jobs").insert({
+      job_type: "chat_complex",
+      payload: { message_id: record.id, task_type: intent },
+    })
+    if (jobErr) {
+      console.error("[chat-router] failed to enqueue job:", jobErr.message)
+      await supabase.from("messages").insert({
+        role: "agent",
+        content: "Couldn't queue your request. Please try again.",
+        ...(record.conversation_id != null && { conversation_id: record.conversation_id }),
+      })
+    } else {
+      console.log("[chat-router] enqueued chat_complex job for message", record.id)
+    }
   }
 
   } catch (e) {
