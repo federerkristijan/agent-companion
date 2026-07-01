@@ -5,8 +5,9 @@
 ## Snapshot
 
 - **Date:** 2026-07-01
-- **Branch:** `feat/agents-server-migration`
-- **Focus:** (1) establish this session-continuity workflow; (2) add `cover_image_caption` + `sources` to the article generator.
+- **Branch:** `docs/project-standards` (this session's docs work; blog changes deferred to a new session).
+- **Focus (this session — done):** establish the session-continuity workflow + community-standard project files.
+- **Next session:** implement blog `cover_image_caption` + `sources` in the article generator.
 
 ## Project (recap — see [README.md](README.md) / [PROJECT_BRIEF.md](PROJECT_BRIEF.md))
 
@@ -35,6 +36,7 @@
 - Session context persistence: **two files in root** — `SESSION_WORKFLOW.md` (rules) + `SESSION_CONTEXT.md` (state), kept separate for write-safety and clean diffs.
 - Global standard (in `~/.claude/CLAUDE.md`): every project must have, in order — `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, `CHANGELOG.md`, `LICENSE`, `SESSION_WORKFLOW.md`, `SESSION_CONTEXT.md`.
 
-## Next steps
+## Next steps (next session starts here)
 
-- Locate the current article-writing code (post-`agent_jobs` migration) and add the two new fields to both the blog insert/upsert and the generation prompt/schema.
+- **Blog schema update — `cover_image_caption` + `sources`.** First resolve the open question: does the article-writing code still live in this repo, or did it move to the `agent_jobs` server (per the `remove migrated agents` commit)? If here → add both fields to the blog insert/upsert **and** the generation prompt/schema. If on the server → the change belongs in that repo, not this one.
+- Full contract + conventions for the two fields are captured under **In-flight work** above.
